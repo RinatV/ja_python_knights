@@ -20,14 +20,15 @@ def checkMove(board):
     for i in range(DIRECTIONS):
         new_x = x_start + move_x[i]  # user coordinates 1 - n
         new_y = y_start + move_y[i]  # user coordinates 1 - n
-        if new_x in range(1, ncols + 1) and new_y in range(1, nrows + 1):
+        if new_x in range(1, ncols+1) and new_y in range(1, nrows + 1):
             movelist.append([new_x, new_y])
-    for i in range(ncols):
-        for j in range(nrows):
-            if [i + 1, j + 1] in movelist:
-                if board[j][i] not in ["o", "O", "0"]:
-                    return False, CheckResult.wrong("Marker missing from possible move")
-            elif i + 1 == x_start and j + 1 == y_start:
+    for i in range(ncols):          # i = x = cols
+        for j in range(nrows):      # j = y = rows
+            if [i+1, j+1] in movelist:
+                possible = warnsdorff(i + 1 , j + 1, board)
+                if board[j][i] != str(possible):
+                    return False, CheckResult.wrong("Incorrect value or marker missing from possible move")
+            elif i+1 == x_start and j+1 == y_start:
                 if board[j][i] not in ["x", "X"]:
                     return False, CheckResult.wrong("Incorrect starting position or marker")
             else:
@@ -35,6 +36,30 @@ def checkMove(board):
                     return False, CheckResult.wrong("Markers placed in wrong location")
     return True, CheckResult.correct()
 
+
+def warnsdorff(cur_x, cur_y, board):
+    possible = 0
+    for i in range(DIRECTIONS):
+        new_x = cur_x + move_x[i]   # user coordinates 1 - n
+        new_y = cur_y + move_y[i]   # user coordinates 1 - n
+        if validMove(new_x, new_y, board):
+            possible += 1
+    return possible
+
+
+def validMove(x, y, board):  # user coordinates 1 - n
+    if not onBoard(x, y):
+        return False
+
+    if not "_" in board[y-1][x-1]:
+        return False
+    return True
+
+
+def onBoard(x, y):  # user coordinates 1 - n
+    if x > 0 and y > 0 and x <= ncols and y <= nrows:
+        return True
+    return False
 
 random.seed()
 ncols = random.randint(3, 8)
@@ -93,7 +118,7 @@ class KnightsTourTest(StageTest):
         try:
             if reply == "":
                 return CheckResult.wrong("Output was empty")
-            border = "-" * (ncols * (xaxiswidth + 1) + 3) + "\n"
+            border = "-" * (ncols * (xaxiswidth+1) + 3) + "\n"
             if border not in reply:
                 return CheckResult.wrong(f"The board borders aren't found.\n"
                                          f"For a board of {ncols} columns and cell width {xaxiswidth}, \n"
@@ -191,9 +216,7 @@ class KnightsTourTest(StageTest):
                             return CheckResult.wrong("Incorrect placeholder width or marker")
 
         # check possible moves
-        # print(*board2, sep="\n")
         board2 = board2[::-1]
-        # print(board2)
         valid_board, message = checkMove(board2)
         if valid_board:
             pass

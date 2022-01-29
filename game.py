@@ -48,13 +48,30 @@ def bottom_nums():
     return bottom
 
 
+def landings(x, y):
+    positions = set()
+    for dx, dy in [(1, 2), (2, 1), (-1, -2), (-2, -1), (-1, 2), (2, -1), (1, -2), (-2, 1)]:
+        if 1 <= x + dx <= size_x and 1 <= y + dy <= size_y:
+            positions.add((x + dx, y + dy))
+    return positions
+
+
 def landing_positions():
     positions = set()
     for x, y in knights:
-        for dx, dy in [(1, 2), (2, 1), (-1, -2), (-2, -1), (-1, 2), (2, -1), (1, -2), (-2, 1)]:
-            if 1 <= x + dx <= size_x and 1 <= y + dy <= size_y:
-                positions.add((x + dx, y + dy))
+        positions.update(landings(x, y))
     return positions
+
+
+def warnsdorff(x, y):
+    cells = set(knights)
+    cells.add((x, y))
+    positions = landings(x, y)
+    counter = 0
+    for cell in positions:
+        if not cell in cells:
+            counter += 1
+    return counter
 
 
 def horizontal_line(row):
@@ -63,7 +80,7 @@ def horizontal_line(row):
         if (col, row) in knights:
             line += cell(' ', ' ', 'X')
         elif (col, row) in landing_positions():
-            line += cell(' ', ' ', 'O')
+            line += cell(' ', ' ', warnsdorff(col, row))
         else:
             line += cell(' ', '_', '')
     line += ' |'
