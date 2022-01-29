@@ -5,20 +5,46 @@ from hstest.check_result import CheckResult
 from copy import deepcopy
 import random
 
+# constants
+DIRECTIONS = 8
+move_x = [2, 1, -1, -2, -2, -1, 1, 2]
+move_y = [1, 2, 2, 1, -1, -2, -2, -1]
+
 
 def digits(num):
     return len(str(num))
 
 
+def checkMove(board):
+    movelist = []
+    for i in range(DIRECTIONS):
+        new_x = x_start + move_x[i]  # user coordinates 1 - n
+        new_y = y_start + move_y[i]  # user coordinates 1 - n
+        if new_x in range(1, ncols + 1) and new_y in range(1, nrows + 1):
+            movelist.append([new_x, new_y])
+    for i in range(ncols):
+        for j in range(nrows):
+            if [i + 1, j + 1] in movelist:
+                if board[j][i] not in ["o", "O", "0"]:
+                    return False, CheckResult.wrong("Marker missing from possible move")
+            elif i + 1 == x_start and j + 1 == y_start:
+                if board[j][i] not in ["x", "X"]:
+                    return False, CheckResult.wrong("Incorrect starting position or marker")
+            else:
+                if "_" not in board[j][i]:
+                    return False, CheckResult.wrong("Markers placed in wrong location")
+    return True, CheckResult.correct()
+
+
 random.seed()
-ncols = random.randint(1, 8)
-nrows = random.randint(1, 8)
+ncols = random.randint(3, 8)
+nrows = random.randint(3, 8)
 
 yaxiswidth = digits(nrows)
 xaxiswidth = digits(nrows * ncols)
 size = str(ncols) + " " + str(nrows)
-x_start = random.randint(1, ncols)
-y_start = random.randint(1, nrows)
+x_start = random.randint(3, ncols)
+y_start = random.randint(3, nrows)
 start = str(x_start) + " " + str(y_start)
 
 
@@ -74,7 +100,7 @@ class KnightsTourTest(StageTest):
                                          f"the following line should be printed as a border:\n"
                                          f"{border}\n"
                                          f"That is, a line of length {len(border)}.")
-            reply = reply.split(border.strip())
+            reply = reply.split(border)
             if len(reply) != 3:
                 return CheckResult.wrong("Incorrect border or spacing. \n"
                                          "There should be 2 identical borders for a board.\n"
@@ -102,8 +128,7 @@ class KnightsTourTest(StageTest):
         # check location of xcol = 1 for alignment
         try:
             x_one_pos = yaxiswidth + 1 + 1 + xaxiswidth
-            print(xaxis2[x_one_pos - 1])
-            if xaxis2.replace('\n', '')[x_one_pos - 1] != "1":
+            if xaxis2[x_one_pos - 1] != "1":
                 return CheckResult.wrong("Incorrect column number alignment or placeholder width")
             xaxis2 = xaxis2.strip()
             # check rest of column numbers for alignment
@@ -119,6 +144,7 @@ class KnightsTourTest(StageTest):
         except:
             return CheckResult.wrong("There is something wrong with your column numbers")
 
+        board2 = []
         # iterate through rows to check
         for n, row in enumerate(board):
             rownum = nrows - n
@@ -135,8 +161,10 @@ class KnightsTourTest(StageTest):
             if len(row) != 2:
                 return CheckResult.wrong("Incorrect side borders or format")
 
-            if len(row[0].replace('\n', '').strip()) != yaxiswidth:
+            if len(row[0].strip()) != yaxiswidth:
                 return CheckResult.wrong("Row numbers or side border not aligned")
+
+            board2.append(row[1].split())
 
             # check if knight in correct position
             if rownum == y_start:
@@ -160,7 +188,17 @@ class KnightsTourTest(StageTest):
                 for place in row:
                     if place not in ['x', 'X']:
                         if place != '_' * xaxiswidth:
-                            return CheckResult.wrong("Incorrect placeholder width")
+                            return CheckResult.wrong("Incorrect placeholder width or marker")
+
+        # check possible moves
+        # print(*board2, sep="\n")
+        board2 = board2[::-1]
+        # print(board2)
+        valid_board, message = checkMove(board2)
+        if valid_board:
+            pass
+        else:
+            return message
 
         return CheckResult.correct()
 
