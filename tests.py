@@ -1,36 +1,55 @@
+# from hstest.stage_test import StageTest
 from hstest.stage_test import *
 from hstest.test_case import TestCase, SimpleTestCase
 from hstest.check_result import CheckResult
+from copy import deepcopy
 import random
 
-random.seed()
-x_start = random.randint(1, 8)
-y_start = random.randint(1, 8)
-start = str(x_start) + " " + str(y_start)
 
-ncols = 8
-nrows = 8
+def digits(num):
+    return len(str(num))
+
+
+random.seed()
+ncols = random.randint(1, 8)
+nrows = random.randint(1, 8)
+
+yaxiswidth = digits(nrows)
+xaxiswidth = digits(nrows * ncols)
+size = str(ncols) + " " + str(nrows)
+x_start = random.randint(1, ncols)
+y_start = random.randint(1, nrows)
+start = str(x_start) + " " + str(y_start)
 
 
 class KnightsTourTest(StageTest):
     def generate(self) -> List[TestCase]:
-        return [TestCase(stdin=[self.check_request]),
-                TestCase(stdin=["1 10", start], check_function=self.check_bounds),
-                TestCase(stdin=["-1 5", start], check_function=self.check_bounds),
-                TestCase(stdin=["1", start], check_function=self.check_length),
-                TestCase(stdin=["1 1 1", start], check_function=self.check_length),
-                TestCase(stdin=["1 a", start], check_function=self.check_num),
-                TestCase(stdin=start), ]
+        return [TestCase(stdin=[self.check_request_size, self.check_request_start]),
+                TestCase(stdin=["-1 10", size, start], check_function=self.check_bounds),
+                TestCase(stdin=["1", size, start], check_function=self.check_length),
+                TestCase(stdin=["a 10", size, start], check_function=self.check_num),
+                TestCase(stdin=[size, "0 0", start], check_function=self.check_bounds),
+                TestCase(stdin=[size, "1", start], check_function=self.check_length),
+                TestCase(stdin=[size, "a 1", start], check_function=self.check_num),
+                TestCase(stdin=[size, "-1 " + str(y_start), start], check_function=self.check_bounds),
+                TestCase(stdin=[size, str(ncols + 1) + " " + str(nrows + 1), start], check_function=self.check_bounds),
+                TestCase(stdin=[size, start]), ]
 
-    def check_request(self, output):
+    def check_request_size(self, output):
         output = output.lower()
-        if "enter" not in output.lower() or "starting position" not in output.lower():
+        if "dimension" not in output:
+            return CheckResult.wrong("Your program should ask for the board dimensions")
+        return size
+
+    def check_request_start(self, output):
+        output = output.lower()
+        if "position" not in output:
             return CheckResult.wrong("Your program should ask for the knight's starting position")
         return start
 
     def check_bounds(self, reply: str, attach: Any) -> CheckResult:
         if "invalid" not in reply.lower():
-            return CheckResult.wrong("Your program should check if the position is within bounds")
+            return CheckResult.wrong("Your program should check if the board size and position are within bounds")
         return CheckResult.correct()
 
     def check_length(self, reply: str, attach: Any) -> CheckResult:
@@ -48,18 +67,18 @@ class KnightsTourTest(StageTest):
         try:
             if reply == "":
                 return CheckResult.wrong("Output was empty")
-            border = "-------------------\n"
+            border = "-" * (ncols * (xaxiswidth + 1) + 3) + "\n"
             if border not in reply:
                 return CheckResult.wrong(f"The board borders aren't found.\n"
-                                         f"For the current board, \n"
+                                         f"For a board of {ncols} columns and cell width {xaxiswidth}, \n"
                                          f"the following line should be printed as a border:\n"
                                          f"{border}\n"
                                          f"That is, a line of length {len(border)}.")
-            reply = reply.split(border)
+            reply = reply.split(border.strip())
             if len(reply) != 3:
                 return CheckResult.wrong("Incorrect border or spacing. \n"
                                          "There should be 2 identical borders for a board.\n"
-                                         f"For the current board, \n"
+                                         f"For a board of {ncols} columns and cell width {xaxiswidth}, \n"
                                          f"the following line should be printed as a border:\n"
                                          f"{border}\n"
                                          f"That is, a line of length {len(border)}.")
@@ -71,40 +90,77 @@ class KnightsTourTest(StageTest):
             board = reply[1].split(" |\n")[0:nrows]
             if len(board) != nrows:
                 return CheckResult.wrong("Incorrect side borders or format")
-            xaxis = reply[2].strip().split(" ")
-        except IndexError:
-            return CheckResult.wrong("Incorrect top or bottom border")
 
-        if len(xaxis) != len(board):
-            return CheckResult.wrong("Make sure you output column numbers under the board in the correct format.")
+            xaxis1 = deepcopy(reply[2])
+            xaxis1 = xaxis1.strip().split()
+            xaxis2 = deepcopy(reply[2])
+            if len(xaxis1) != ncols:
+                return CheckResult.wrong("Incorrect column numbers")
+        except IndexError:
+            return CheckResult.wrong("Incorrect border or spacing")
+
+        # check location of xcol = 1 for alignment
+        try:
+            x_one_pos = yaxiswidth + 1 + 1 + xaxiswidth
+            print(xaxis2[x_one_pos - 1])
+            if xaxis2.replace('\n', '')[x_one_pos - 1] != "1":
+                return CheckResult.wrong("Incorrect column number alignment or placeholder width")
+            xaxis2 = xaxis2.strip()
+            # check rest of column numbers for alignment
+            for n in range(1, ncols):
+                xaxis2 = xaxis2.split(" " * (xaxiswidth - digits(n + 1) + 1), 1)
+                if len(xaxis2) != 2:
+                    return CheckResult.wrong("Spacing between column numbers is incorrect")
+                if str(n) != xaxis2[0]:
+                    return CheckResult.wrong("Incorrect column number alignment or placeholder width")
+                xaxis2 = xaxis2[1]
+            if str(ncols) != xaxis2:
+                return CheckResult.wrong("Incorrect column number alignment or placeholder width")
+        except:
+            return CheckResult.wrong("There is something wrong with your column numbers")
 
         # iterate through rows to check
         for n, row in enumerate(board):
             rownum = nrows - n
             colnum = n + 1
-            try:
-                output_column_number = int(xaxis[n])
-            except ValueError:
-                return CheckResult.wrong("Make sure that the last line of your output is the line with column numbers.\n"
-                                         "These numbers should be separated by whitespace characters.")
-            if colnum != output_column_number:
+
+            # check column numbers
+            if colnum > ncols:
+                pass
+            elif colnum != int(xaxis1[n]):
                 return CheckResult.wrong("Incorrect column numbers")
+
+            # split at left border, check if row split correctly
+            row = row.split("|")
+            if len(row) != 2:
+                return CheckResult.wrong("Incorrect side borders or format")
+
+            if len(row[0].replace('\n', '').strip()) != yaxiswidth:
+                return CheckResult.wrong("Row numbers or side border not aligned")
+
+            # check if knight in correct position
             if rownum == y_start:
-                row = row.split("|")
-                if len(row) != 2:
-                    return CheckResult.wrong("Incorrect side borders or format")
-                try:
-                    row_number = int(row[0])
-                except ValueError:
-                    return CheckResult.wrong("The first symbol in each line of the board should be a number of the line.\n"
-                                             "In line {0}, the first symbol is not a number.".format(n))
-                if rownum != row_number:
+
+                # check row number
+                if rownum != int(row[0]):
                     return CheckResult.wrong("Incorrect row numbers")
-                row = row[1].strip().split(" ")
+
+                # extract each position, including placeholders and knight
+                row = row[1].strip().split()
+
+                #   check if number of columns is correct
                 if len(row) != ncols:
                     return CheckResult.wrong("Incorrect board dimension")
-                if row[x_start - 1] == "_":
-                    return CheckResult.wrong("Incorrect starting position")
+
+                # check correct position
+                if row[x_start - 1] not in ['x', 'X']:
+                    return CheckResult.wrong("Incorrect starting position or marker")
+
+                # check this row if placeholders are correct
+                for place in row:
+                    if place not in ['x', 'X']:
+                        if place != '_' * xaxiswidth:
+                            return CheckResult.wrong("Incorrect placeholder width")
 
         return CheckResult.correct()
 
