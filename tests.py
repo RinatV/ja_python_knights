@@ -71,7 +71,7 @@ def onBoard(x, y):  # user coordinates 1 - n
 random.seed()
 ncols = 4
 nrows = 3
-moves = [[1, 1], [3, 2], [1, 3], [2, 1]]
+moves = [[3, 2], [1, 3], [2, 1]]
 
 yaxiswidth = digits(nrows)
 xaxiswidth = digits(nrows * ncols)
