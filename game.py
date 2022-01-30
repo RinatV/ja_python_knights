@@ -1,15 +1,23 @@
 import os
 
+# tstdin = ["4 3", "1 1", "3 2", "1 3", "2 1", "4 2", "2 3", "3 1", "1 2", "3 3", "4 1", "2 2", "4 3"]
+stdin = []
+
 
 def input_xy(msg, value_errmsg, assert_func=lambda x, y: x > 0 and y > 0):
     while True:
         try:
-            inp = input(msg)
+            if 'tstdin' not in globals():
+                inp = input(msg)
+            else:
+                inp = tstdin.pop(0)
+                print(msg, inp)
             x, y = tuple(map(int, inp.split()))
             assert assert_func(x, y)
-        except:
+        except (ValueError, AssertionError):
             print(value_errmsg)
         else:
+            stdin.append(f'{x} {y}')
             return x, y
 
 
@@ -21,6 +29,7 @@ def is_inboard(x, y):
 
 
 x, y = input_xy("Enter the knight's starting position: ", 'Invalid position!', is_inboard)
+start_x, start_y = x, y
 
 knights = set()
 knights.add((x, y))
@@ -63,6 +72,9 @@ def landing_positions():
     return positions
 
 
+stop = False
+
+
 def warnsdorff(x, y):
     cells = set(knights)
     cells.add((x, y))
@@ -74,27 +86,59 @@ def warnsdorff(x, y):
     return counter
 
 
+last = [start_x, start_y]
+
+
 def horizontal_line(row):
     line = f"{left_label(row)}|"
+    moves = None
     for col in range(1, size_x + 1):
         if (col, row) in knights:
-            line += cell(' ', ' ', 'X')
-        elif (col, row) in landing_positions():
-            line += cell(' ', ' ', warnsdorff(col, row))
+            if col == last[0] and row == last[1]:
+                line += cell(' ', ' ', 'X')
+            else:
+                line += cell(' ', ' ', '*')
+        elif (col, row) in landings(x, y):
+            cell_moves = warnsdorff(col, row)
+            moves = moves if cell_moves == 0 else True
+            line += cell(' ', ' ', cell_moves)
         else:
             line += cell(' ', '_', '')
     line += ' |'
-    return line
+    return line, moves
 
 
 def chess_board():
     board = []
     board.append(horizontal_divider())
+    moves = None
     for hor in range(size_y, 0, -1):
-        board.append(horizontal_line(hor))
+        line, line_moves = horizontal_line(hor)
+        moves = moves or line_moves
+        board.append(line)
     board.append(horizontal_divider())
     board.append(bottom_nums())
-    return os.linesep.join(board)
+    return os.linesep.join(board), moves
 
 
-print(chess_board())
+print(chess_board()[0])
+
+
+def is_posible(x, y):
+    return is_inboard(x, y) and not (x, y) in knights and (x, y) in landings(*last)
+
+
+while True:
+    x, y = input_xy("Enter your next move: ", 'Invalid move!', is_posible)
+    last[0], last[1] = x, y
+    _, moves = chess_board()
+    knights.add((x, y))
+    board, _ = chess_board()
+    print(board)
+    if len(knights) == size_x * size_y:
+        print('What a great tour! Congratulations!')
+        break
+    if moves is None:
+        print('No more possible moves!')
+        print(f'Your knight visited {len(knights)} squares!')
+        break

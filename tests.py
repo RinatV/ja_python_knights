@@ -1,9 +1,9 @@
 # from hstest.stage_test import StageTest
 from hstest.stage_test import *
-from hstest.test_case import TestCase, SimpleTestCase
+from hstest.test_case import TestCase
 from hstest.check_result import CheckResult
-from copy import deepcopy
 import random
+from hstest.exception.outcomes import ErrorWithFeedback
 
 # constants
 DIRECTIONS = 8
@@ -17,20 +17,27 @@ def digits(num):
 
 def checkMove(board):
     movelist = []
+    lastx = moves[-1][0]
+    lasty = moves[-1][1]
     for i in range(DIRECTIONS):
-        new_x = x_start + move_x[i]  # user coordinates 1 - n
-        new_y = y_start + move_y[i]  # user coordinates 1 - n
-        if new_x in range(1, ncols+1) and new_y in range(1, nrows + 1):
+        new_x = lastx + move_x[i]  # user coordinates 1 - n
+        new_y = lasty + move_y[i]  # user coordinates 1 - n
+        if new_x in range(1, ncols + 1) and new_y in range(1, nrows + 1) and (
+                "_" in board[new_y - 1][new_x - 1] or board[new_y - 1][new_x - 1].isnumeric()):
             movelist.append([new_x, new_y])
-    for i in range(ncols):          # i = x = cols
-        for j in range(nrows):      # j = y = rows
-            if [i+1, j+1] in movelist:
-                possible = warnsdorff(i + 1 , j + 1, board)
+
+    for i in range(ncols):  # i = x = cols
+        for j in range(nrows):  # j = y = rows
+            if [i + 1, j + 1] in movelist:
+                possible = warnsdorff(i + 1, j + 1, board)
                 if board[j][i] != str(possible):
                     return False, CheckResult.wrong("Incorrect value or marker missing from possible move")
-            elif i+1 == x_start and j+1 == y_start:
+            elif i + 1 == lastx and j + 1 == lasty:
                 if board[j][i] not in ["x", "X"]:
                     return False, CheckResult.wrong("Incorrect starting position or marker")
+            elif [i + 1, j + 1] in moves:
+                if board[j][i] != "*":
+                    return False, CheckResult.wrong("Incorrect marker or marker missing from previous move")
             else:
                 if "_" not in board[j][i]:
                     return False, CheckResult.wrong("Markers placed in wrong location")
@@ -40,8 +47,8 @@ def checkMove(board):
 def warnsdorff(cur_x, cur_y, board):
     possible = 0
     for i in range(DIRECTIONS):
-        new_x = cur_x + move_x[i]   # user coordinates 1 - n
-        new_y = cur_y + move_y[i]   # user coordinates 1 - n
+        new_x = cur_x + move_x[i]  # user coordinates 1 - n
+        new_y = cur_y + move_y[i]  # user coordinates 1 - n
         if validMove(new_x, new_y, board):
             possible += 1
     return possible
@@ -50,8 +57,7 @@ def warnsdorff(cur_x, cur_y, board):
 def validMove(x, y, board):  # user coordinates 1 - n
     if not onBoard(x, y):
         return False
-
-    if not "_" in board[y-1][x-1]:
+    if not "_" in board[y - 1][x - 1] and not board[y - 1][x - 1].isnumeric():
         return False
     return True
 
@@ -61,9 +67,11 @@ def onBoard(x, y):  # user coordinates 1 - n
         return True
     return False
 
+
 random.seed()
-ncols = random.randint(3, 8)
-nrows = random.randint(3, 8)
+ncols = 4
+nrows = 3
+moves = [[1, 1], [3, 2], [1, 3], [2, 1]]
 
 yaxiswidth = digits(nrows)
 xaxiswidth = digits(nrows * ncols)
@@ -76,15 +84,28 @@ start = str(x_start) + " " + str(y_start)
 class KnightsTourTest(StageTest):
     def generate(self) -> List[TestCase]:
         return [TestCase(stdin=[self.check_request_size, self.check_request_start]),
-                TestCase(stdin=["-1 10", size, start], check_function=self.check_bounds),
-                TestCase(stdin=["1", size, start], check_function=self.check_length),
-                TestCase(stdin=["a 10", size, start], check_function=self.check_num),
-                TestCase(stdin=[size, "0 0", start], check_function=self.check_bounds),
-                TestCase(stdin=[size, "1", start], check_function=self.check_length),
-                TestCase(stdin=[size, "a 1", start], check_function=self.check_num),
-                TestCase(stdin=[size, "-1 " + str(y_start), start], check_function=self.check_bounds),
-                TestCase(stdin=[size, str(ncols + 1) + " " + str(nrows + 1), start], check_function=self.check_bounds),
-                TestCase(stdin=[size, start]), ]
+                TestCase(stdin=["0 10", self.check_bounds]),
+                TestCase(stdin=["1", self.check_length]),
+                TestCase(stdin=["a 10", self.check_num]),
+                TestCase(stdin=[size, "0 10", self.check_bounds]),
+                TestCase(stdin=[size, "1", self.check_length]),
+                TestCase(stdin=[size, "a 1", self.check_num]),
+                TestCase(stdin=[size, start, self.check_next_move]),
+
+                # # no solution case
+                TestCase(stdin=["3 3", "1 1", "1 1", self.check_valid_move]),  # choose taken spot
+                TestCase(stdin=["3 3", "1 1", "1 2", self.check_knight_move]),  # not knight's move
+                TestCase(stdin=["3 3", "1 1", "3 2", "3 2", self.check_valid_move]),  # choose taken spot
+                TestCase(stdin=["3 3", "1 1", "3 2", "3 3", self.check_knight_move]),  # not knight's move
+                TestCase(stdin=["3 3", "1 1", "3 2", "1 3", "2 1", "3 3", "1 2", "3 1", "2 3"], attach="8",
+                         check_function=self.check_dead_end),
+
+                # finish board case
+                TestCase(stdin=["4 3", "1 1", "3 2", "1 3", "2 1", self.check_progress]),
+                TestCase(
+                    stdin=["4 3", "1 1", "3 2", "1 3", "2 1", "4 2", "2 3", "3 1", "1 2", "3 3", "4 1", "2 2", "4 3"],
+                    check_function=self.check_finish),
+                ]
 
     def check_request_size(self, output):
         output = output.lower()
@@ -96,29 +117,72 @@ class KnightsTourTest(StageTest):
         output = output.lower()
         if "position" not in output:
             return CheckResult.wrong("Your program should ask for the knight's starting position")
-        return start
+        # return start
+        return CheckResult.correct()
 
-    def check_bounds(self, reply: str, attach: Any) -> CheckResult:
-        if "invalid" not in reply.lower():
+    def check_bounds(self, output):
+        if "invalid" not in output.lower():
             return CheckResult.wrong("Your program should check if the board size and position are within bounds")
         return CheckResult.correct()
 
-    def check_length(self, reply: str, attach: Any) -> CheckResult:
-        if "invalid" not in reply.lower():
+    def check_length(self, output):
+        if "invalid" not in output.lower():
             return CheckResult.wrong("Your program should check if there are the right number of inputs")
         return CheckResult.correct()
 
-    def check_num(self, reply: str, attach: Any) -> CheckResult:
-        if "invalid" not in reply.lower():
+    def check_num(self, output):
+        if "invalid" not in output.lower():
             return CheckResult.wrong("Your program should only accept integer inputs")
         return CheckResult.correct()
 
-    def check(self, reply: str, attach: Any) -> CheckResult:
+    def check_next_move(self, output):
+        if "move" not in output.lower():
+            return CheckResult.wrong("Your program should only accept integer inputs")
+        return CheckResult.correct()
+
+    def check_valid_move(self, output):
+        output = output.lower()
+        if "invalid" not in output:
+            return CheckResult.wrong("Your program should check if the space has already been visited")
+        if "move" not in output:
+            return CheckResult.wrong("Your program should ask for another move")
+        return CheckResult.correct()
+
+    def check_knight_move(self, output):
+        output = output.lower()
+        if "invalid" not in output:
+            return CheckResult.wrong("Your program should only accept L-shaped knight moves")
+        return CheckResult.correct()
+
+    def check_dead_end(self, reply: str, attach: Any) -> CheckResult:
+        for line in reply.lower().split("\n")[-4:-1]:
+            if "possible" in line:
+                break
+        else:
+            return CheckResult.wrong("You need check if there are no more possible moves")
+
+        for line in reply.lower().split("\n")[-4:-1]:
+            if attach in line:
+                break
+        else:
+            return CheckResult.wrong("Number of moves taken is incorrect or not displayed")
+        return CheckResult.correct()
+
+    def check_finish(self, reply: str, attach: Any) -> CheckResult:
+        for line in reply.lower().split("\n")[-2:-1]:
+            if "tour" in line:
+                break
+        else:
+            return CheckResult.wrong("End of game message missing.\n"
+                                     "Expected output: 'What a great tour! Congratulations!'")
+        return CheckResult.correct()
+
+    def check_progress(self, reply):
         # check output
         try:
             if reply == "":
                 return CheckResult.wrong("Output was empty")
-            border = "-" * (ncols * (xaxiswidth+1) + 3) + "\n"
+            border = "-" * (ncols * (xaxiswidth + 1) + 3) + "\n"
             if border not in reply:
                 return CheckResult.wrong(f"The board borders aren't found.\n"
                                          f"For a board of {ncols} columns and cell width {xaxiswidth}, \n"
@@ -141,45 +205,14 @@ class KnightsTourTest(StageTest):
             board = reply[1].split(" |\n")[0:nrows]
             if len(board) != nrows:
                 return CheckResult.wrong("Incorrect side borders or format")
-
-            xaxis1 = deepcopy(reply[2])
-            xaxis1 = xaxis1.strip().split()
-            xaxis2 = deepcopy(reply[2])
-            if len(xaxis1) != ncols:
-                return CheckResult.wrong("Incorrect column numbers")
         except IndexError:
             return CheckResult.wrong("Incorrect border or spacing")
-
-        # check location of xcol = 1 for alignment
-        try:
-            x_one_pos = yaxiswidth + 1 + 1 + xaxiswidth
-            if xaxis2[x_one_pos - 1] != "1":
-                return CheckResult.wrong("Incorrect column number alignment or placeholder width")
-            xaxis2 = xaxis2.strip()
-            # check rest of column numbers for alignment
-            for n in range(1, ncols):
-                xaxis2 = xaxis2.split(" " * (xaxiswidth - digits(n + 1) + 1), 1)
-                if len(xaxis2) != 2:
-                    return CheckResult.wrong("Spacing between column numbers is incorrect")
-                if str(n) != xaxis2[0]:
-                    return CheckResult.wrong("Incorrect column number alignment or placeholder width")
-                xaxis2 = xaxis2[1]
-            if str(ncols) != xaxis2:
-                return CheckResult.wrong("Incorrect column number alignment or placeholder width")
-        except:
-            return CheckResult.wrong("There is something wrong with your column numbers")
 
         board2 = []
         # iterate through rows to check
         for n, row in enumerate(board):
             rownum = nrows - n
             colnum = n + 1
-
-            # check column numbers
-            if colnum > ncols:
-                pass
-            elif colnum != int(xaxis1[n]):
-                return CheckResult.wrong("Incorrect column numbers")
 
             # split at left border, check if row split correctly
             row = row.split("|")
@@ -191,31 +224,6 @@ class KnightsTourTest(StageTest):
 
             board2.append(row[1].split())
 
-            # check if knight in correct position
-            if rownum == y_start:
-
-                # check row number
-                if rownum != int(row[0]):
-                    return CheckResult.wrong("Incorrect row numbers")
-
-                # extract each position, including placeholders and knight
-                row = row[1].strip().split()
-
-                #   check if number of columns is correct
-                if len(row) != ncols:
-                    return CheckResult.wrong("Incorrect board dimension")
-
-                # check correct position
-                if row[x_start - 1] not in ['x', 'X']:
-                    return CheckResult.wrong("Incorrect starting position or marker")
-
-                # check this row if placeholders are correct
-                for place in row:
-                    if place not in ['x', 'X']:
-                        if place != '_' * xaxiswidth:
-                            return CheckResult.wrong("Incorrect placeholder width or marker")
-
-        # check possible moves
         board2 = board2[::-1]
         valid_board, message = checkMove(board2)
         if valid_board:
@@ -224,6 +232,10 @@ class KnightsTourTest(StageTest):
             return message
 
         return CheckResult.correct()
+
+    def check(self, reply: str, attach: Any):
+        raise ErrorWithFeedback(f"The program has unexpectedly terminated.\n" +
+                                "It finished execution too early, should continue running.")
 
 
 if __name__ == '__main__':
