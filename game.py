@@ -1,23 +1,14 @@
 import os
 
-# tstdin = ["4 3", "1 1", "3 2", "1 3", "2 1", "4 2", "2 3", "3 1", "1 2", "3 3", "4 1", "2 2", "4 3"]
-stdin = []
-
-
 def input_xy(msg, value_errmsg, assert_func=lambda x, y: x > 0 and y > 0):
     while True:
         try:
-            if 'tstdin' not in globals():
-                inp = input(msg)
-            else:
-                inp = tstdin.pop(0)
-                print(msg, inp)
+            inp = input(msg)
             x, y = tuple(map(int, inp.split()))
             assert assert_func(x, y)
         except (ValueError, AssertionError):
             print(value_errmsg)
         else:
-            stdin.append(f'{x} {y}')
             return x, y
 
 
